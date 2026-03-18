@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "groups")
+@Table(name = "skills_groups")
 @Setter @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Group {
 	@Id

@@ -6,7 +6,7 @@ spring:
       server:
         git:
           uri: https://github.com/iamSt3el/skillsync-config.git
-          default-label: main
+          default-label: d-configs
           clone-on-start: true
 server:
   port: 8888

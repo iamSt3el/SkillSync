@@ -1,8 +1,12 @@
 package com.skillsync.groupService.dto;
 
+import java.time.LocalDate;
+
 import com.skillsync.groupService.entity.Group;
+import com.skillsync.groupService.entity.GroupMember;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -11,8 +15,10 @@ import lombok.Setter;
 @AllArgsConstructor
 @Setter
 @Getter
+@Builder
 public class GroupMemberResponseDTO {
 	private Long id;
-	private Group group;
+	private Long groupId;
 	private	Long userId;
+	private LocalDate joinedAt;
 }
