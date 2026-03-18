@@ -46,17 +46,28 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
 
-        // Fetch role
+        // Save user first to get ID
+        user = userRepository.save(user);
+
+        // Fetch or create ROLE_LEARNER
         Role role = roleRepository.findByName("ROLE_LEARNER")
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseGet(() -> {
+                    Role newRole = new Role("ROLE_LEARNER");
+                    return roleRepository.save(newRole);
+                });
 
         // Create UserRole 
         UserRole userRole = new UserRole(user, role);
 
         // Assign role
-        user.setUserRoles(Set.of(userRole));
+        user.getUserRoles().add(userRole);
 
-        userRepository.save(user);
+        // Save user again to persist UserRole relationship via cascade
+        user = userRepository.save(user);
+        
+     
+
+    
 
         // Convert roles to String list
         List<String> roles = user.getUserRoles()
@@ -68,7 +79,8 @@ public class AuthServiceImpl implements AuthService {
         String token = jwtUtil.generateToken(user.getEmail(), roles);
 
         return new AuthResponse(token);
-    }
+    }        
+    
 
     // login
     @Override

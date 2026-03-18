@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -27,6 +28,13 @@ public class JwtFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
+		String path = request.getServletPath();
+
+	    // ✅ Skip auth endpoints
+	    if (path.startsWith("/auth/login") || path.startsWith("/auth/register")) {
+	        filterChain.doFilter(request, response);
+	        return;
+	    }
 		String authHeader = request.getHeader("Authorization");
 		String token = null;
 		String email = null;
@@ -53,9 +61,16 @@ public class JwtFilter extends OncePerRequestFilter {
 				//convert roles -> authorities
 				List<SimpleGrantedAuthority> authorities = roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList());
 				//create authentication object
-//				UsernamePasswordAuthenticationToken authentication = 
+				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(email,  null, authorities);
+				authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+				
+				//set authentication in context
+				SecurityContextHolder.getContext().setAuthentication(authentication);
 			}
 		}
+		
+		//continue filter chain
+		filterChain.doFilter(request, response);
 	}
 
 }
