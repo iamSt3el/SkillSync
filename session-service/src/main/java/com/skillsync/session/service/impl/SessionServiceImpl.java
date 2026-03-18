@@ -1,11 +1,15 @@
 package com.skillsync.session.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.skillsync.session.dto.SessionBookRequest;
 import com.skillsync.session.entity.Session;
 import com.skillsync.session.entity.SessionStatus;
+import com.skillsync.session.exception.PastDateSessionException;
+import com.skillsync.session.exception.SessionNotFoundException;
 import com.skillsync.session.repository.SessionRepository;
 import com.skillsync.session.service.SessionService;
 
@@ -20,7 +24,7 @@ public class SessionServiceImpl implements SessionService {
 	private final SessionRepository sessionRepository;
 	
 	private Session getSessionOrThrow(Long id) {
-		return sessionRepository.findById(id).orElseThrow(() -> new RuntimeException("Session not found"));
+		return sessionRepository.findById(id).orElseThrow(() -> new SessionNotFoundException(id));
 	}
 	
 	@Override
@@ -30,7 +34,11 @@ public class SessionServiceImpl implements SessionService {
 	}
 
 	@Override
-	public Session bookSession(Session session) {
+	public Session bookSession(SessionBookRequest session) {
+		
+		if(session.getSessionDate().isBefore(LocalDateTime.now())) {
+			throw new PastDateSessionException("Cannot book the session in the past");
+		}
 		session.setStatus(SessionStatus.REQUESTED);
         return sessionRepository.save(session);
 	}
@@ -41,7 +49,7 @@ public class SessionServiceImpl implements SessionService {
 		Session session = getSessionOrThrow(id);
 		
 		if(session.getStatus() != SessionStatus.REQUESTED) {
-			throw new RuntimeException("Only Requested Session Can be Accepted");
+			throw new RuntimeException("Only Requested Session Can be Accepted. Not "+session.getStatus());
 		}
 		
 		session.setStatus(SessionStatus.ACCEPTED);

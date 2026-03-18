@@ -11,4 +11,6 @@ import com.skillsync.session.entity.Session;
 public interface SessionRepository extends JpaRepository<Session, Long> {
 	
 	List<Session> findByLearnerIdOrMentorId(Long learnerId, Long mentorId);
+	
+	boolean findByLearnerIdAndMentorId(Long learnerId, Long mentorId);
 }

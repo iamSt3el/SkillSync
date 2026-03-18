@@ -31,6 +31,9 @@ import lombok.Setter;
 
 //Lombok Annotations -> Reduce boilerplate code
 
+/*
+ * We can combine @Getter and @Setter + @toString + @equals + @hashCode => @Data
+ * */
 @Getter
 @Setter
 @NoArgsConstructor
