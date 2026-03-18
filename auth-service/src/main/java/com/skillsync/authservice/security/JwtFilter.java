@@ -30,7 +30,7 @@ public class JwtFilter extends OncePerRequestFilter {
 			throws ServletException, IOException {
 		String path = request.getServletPath();
 
-	    // ✅ Skip auth endpoints
+	    // Skip auth endpoints - login and register
 	    if (path.startsWith("/auth/login") || path.startsWith("/auth/register")) {
 	        filterChain.doFilter(request, response);
 	        return;
