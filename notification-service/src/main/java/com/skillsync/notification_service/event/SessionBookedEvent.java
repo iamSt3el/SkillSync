@@ -1,0 +1,20 @@
+package com.skillsync.notification_service.event;
+
+import java.time.LocalDate;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class SessionBookedEvent {
+	private Long sessionId;
+	private Long mentorId;
+	private Long learnerId;
+	private LocalDate sessionDate;
+	private String topic;
+}

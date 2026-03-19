@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
 	}
 	
 	@ExceptionHandler(MemberAlreadyInGroupException.class)
-	public ResponseEntity<?> handleMemberAlreadyInGroupException(MemberAlreadyInGroupException ex){
+	public ResponseEntity<?> handleMemberAlreadyInGroup(MemberAlreadyInGroupException ex){
 		return ResponseEntity.status(404).body(ex.getMessage());
 	}
 }
