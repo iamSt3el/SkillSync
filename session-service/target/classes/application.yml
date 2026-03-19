@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: session-service
+
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+# Optional: fail fast if config server is down
+#  cloud:
+#    config:
+#      fail-fast: true
+
+server:
+  port: 8085
