@@ -14,118 +14,98 @@ import com.skillsync.authservice.dto.response.AuthResponse;
 import com.skillsync.authservice.entity.Role;
 import com.skillsync.authservice.entity.User;
 import com.skillsync.authservice.entity.UserRole;
+import com.skillsync.authservice.exception.InvalidCredentialsException;
+import com.skillsync.authservice.exception.InvalidTokenException;
+import com.skillsync.authservice.exception.UserAlreadyExistsException;
 import com.skillsync.authservice.repository.RoleRepository;
 import com.skillsync.authservice.repository.UserRepository;
 import com.skillsync.authservice.security.JwtUtil;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class AuthServiceImpl implements AuthService {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+	private final UserRepository userRepository;
+	private final RoleRepository roleRepository;
+	private final PasswordEncoder passwordEncoder;
+	private final JwtUtil jwtUtil;
 
-    public AuthServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
-        this.roleRepository = roleRepository;
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
-    }
+	public AuthServiceImpl(UserRepository userRepository, RoleRepository roleRepository,
+			PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+		this.roleRepository = roleRepository;
+		this.userRepository = userRepository;
+		this.passwordEncoder = passwordEncoder;
+		this.jwtUtil = jwtUtil;
+	}
 
-    // register
-    @Override
-    public AuthResponse register(RegisterRequest request) {
+	@Override
+	public AuthResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.email())) {
-            throw new RuntimeException("Email already exists");
-        }
+		if (userRepository.existsByEmail(request.email())) {
+			throw new UserAlreadyExistsException(request.email());
+		}
 
-        // Create user
-        User user = new User();
-        user.setUsername(request.username());
-        user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password()));
+		User user = new User();
+		user.setUsername(request.username());
+		user.setEmail(request.email());
+		user.setPassword(passwordEncoder.encode(request.password()));
+		user = userRepository.save(user);
 
-        // Save user first to get ID
-        user = userRepository.save(user);
+		Role role = roleRepository.findByName("ROLE_LEARNER").orElseGet(() -> {
+			Role newRole = new Role("ROLE_LEARNER");
+			return roleRepository.save(newRole);
+		});
 
-        // Fetch or create ROLE_LEARNER
-        Role role = roleRepository.findByName("ROLE_LEARNER")
-                .orElseGet(() -> {
-                    Role newRole = new Role("ROLE_LEARNER");
-                    return roleRepository.save(newRole);
-                });
+		UserRole userRole = new UserRole(user, role);
+		user.getUserRoles().add(userRole);
+		user = userRepository.save(user);
 
-        // Create UserRole 
-        UserRole userRole = new UserRole(user, role);
+		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
+				.collect(Collectors.toList());
 
-        // Assign role
-        user.getUserRoles().add(userRole);
+		String token = jwtUtil.generateToken(user.getEmail(), roles);
+		log.info("User registered: {}", user.getEmail());
 
-        // Save user again to persist UserRole relationship via cascade
-        user = userRepository.save(user);
-        
-     
+		return new AuthResponse(token);
+	}
 
-    
+	@Override
+	public AuthResponse login(LoginRequest request) {
 
-        // Convert roles to String list
-        List<String> roles = user.getUserRoles()
-                .stream()
-                .map(ur -> ur.getRole().getName())
-                .collect(Collectors.toList());
+		User user = userRepository.findByEmail(request.email()).orElseThrow(() -> new InvalidCredentialsException());
 
-        // Generate token
-        String token = jwtUtil.generateToken(user.getEmail(), roles);
+		if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+			throw new InvalidCredentialsException(); // ← was RuntimeException
+		}
 
-        return new AuthResponse(token);
-    }        
-    
+		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
+				.collect(Collectors.toList());
 
-    // login
-    @Override
-    public AuthResponse login(LoginRequest request) {
+		String token = jwtUtil.generateToken(user.getEmail(), roles);
+		log.info("User logged in: {}", user.getEmail());
 
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+		return new AuthResponse(token);
+	}
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
-        }
+	@Override
+	public AuthResponse refreshToken(String token) {
 
-        // Extract roles
-        List<String> roles = user.getUserRoles()
-                .stream()
-                .map(ur -> ur.getRole().getName())
-                .collect(Collectors.toList());
+		if (jwtUtil.isTokenExpired(token)) {
+			throw new InvalidTokenException();
+		}
 
-        String token = jwtUtil.generateToken(user.getEmail(), roles);
+		String email = jwtUtil.extractEmail(token);
 
-        return new AuthResponse(token);
-    }
+		User user = userRepository.findByEmail(email).orElseThrow(() -> new InvalidCredentialsException()); 
 
-    // refresh token
-    @Override
-    public AuthResponse refreshToken(String token) {
+		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
+				.collect(Collectors.toList());
 
-        String email = jwtUtil.extractEmail(token);
+		String newToken = jwtUtil.generateToken(email, roles);
+		log.info("Token refreshed for: {}", email);
 
-        if (jwtUtil.isTokenExpired(token)) {
-            throw new RuntimeException("Token expired");
-        }
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Extract roles again
-        List<String> roles = user.getUserRoles()
-                .stream()
-                .map(ur -> ur.getRole().getName())
-                .collect(Collectors.toList());
-
-        String newToken = jwtUtil.generateToken(email, roles);
-
-        return new AuthResponse(newToken);
-    }
-
+		return new AuthResponse(newToken);
+	}
 }
