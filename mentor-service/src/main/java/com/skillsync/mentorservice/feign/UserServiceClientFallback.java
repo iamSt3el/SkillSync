@@ -1,0 +1,17 @@
+package com.skillsync.mentorservice.feign;
+
+import com.skillsync.mentorservice.dto.response.UserResponse;
+import org.springframework.stereotype.Component;
+
+@Component
+public class UserServiceClientFallback implements UserServiceClient {
+
+    @Override
+    public UserResponse getUserById(Long userId) {
+        return UserResponse.builder()
+                .id(userId)
+                .name("Unknown User")
+                .email("N/A")
+                .build();
+    }
+}
