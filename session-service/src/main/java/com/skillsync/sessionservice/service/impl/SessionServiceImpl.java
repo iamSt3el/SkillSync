@@ -13,7 +13,7 @@ import com.skillsync.sessionservice.dto.request.SessionBookRequest;
 import com.skillsync.sessionservice.dto.response.SessionResponse;
 import com.skillsync.sessionservice.entity.Session;
 import com.skillsync.sessionservice.entity.SessionStatus;
-import com.skillsync.sessionservice.event.SessionBookedEvent;
+import com.skillsync.sessionservice.event.SessionEvent;
 import com.skillsync.sessionservice.exception.InvalidSessionStateException;
 import com.skillsync.sessionservice.exception.MentorNotFoundException;
 import com.skillsync.sessionservice.exception.ServiceUnavailableException;
@@ -35,151 +35,149 @@ public class SessionServiceImpl implements SessionService {
     private final RabbitTemplate rabbitTemplate;
     private final MentorClient mentorClient;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // POST /sessions  →  Book a new session (state: REQUESTED)
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // BOOK SESSION
+    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public SessionResponse bookSession(SessionBookRequest request) {
-        log.info("Booking session: mentorId={}, learnerId={}", request.getMentorId(), request.getLearnerId());
 
-        // Validate mentor exists via Feign (circuit breaker applied via fallback)
-        try {
-            Boolean mentorExists = mentorClient.mentorExists(request.getMentorId());
-
-            if (!Boolean.TRUE.equals(mentorExists)) {
-                throw new MentorNotFoundException(
-                    "Mentor with id " + request.getMentorId() + " does not exist."
-                );
-            }
-
-        } catch (MentorNotFoundException ex) {
-            throw ex; // rethrow (business exception)
-
-        } catch (Exception ex) {
-            log.error("Mentor validation failed due to service issue: {}", ex.getMessage());
-
-            throw new ServiceUnavailableException(
-                    "Mentor service is currently unavailable. Please try again later."
-            );
-        }
+        validateMentor(request.getMentorId());
 
         Session session = sessionMapper.toEntity(request);
-        Session savedSession = sessionRepository.save(session);
+        Session saved = sessionRepository.save(session);
 
-        // Publish SESSION_BOOKED event to RabbitMQ
-        publishSessionBookedEvent(savedSession);
+        publishSessionEvent(saved, RabbitMQConfig.SESSION_BOOKED_KEY);
 
-        log.info("Session booked successfully with id={}", savedSession.getId());
-        return sessionMapper.toResponse(savedSession);
+        return sessionMapper.toResponse(saved);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PUT /sessions/{id}/accept  →  REQUESTED → ACCEPTED
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // ACCEPT SESSION
+    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public SessionResponse acceptSession(Long sessionId) {
-        log.info("Accepting session id={}", sessionId);
+
         Session session = findSessionOrThrow(sessionId);
 
         if (session.getStatus() != SessionStatus.REQUESTED) {
-            throw new InvalidSessionStateException(
-                    "Cannot accept session in status: " + session.getStatus() +
-                    ". Only REQUESTED sessions can be accepted."
-            );
+            throw new InvalidSessionStateException("Only REQUESTED can be accepted");
         }
 
         session.setStatus(SessionStatus.ACCEPTED);
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        Session updated = sessionRepository.save(session);
+
+        publishSessionEvent(updated, RabbitMQConfig.SESSION_ACCEPTED_KEY);
+
+        return sessionMapper.toResponse(updated);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PUT /sessions/{id}/reject  →  REQUESTED → REJECTED
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // REJECT SESSION
+    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public SessionResponse rejectSession(Long sessionId) {
-        log.info("Rejecting session id={}", sessionId);
+
         Session session = findSessionOrThrow(sessionId);
 
         if (session.getStatus() != SessionStatus.REQUESTED) {
-            throw new InvalidSessionStateException(
-                    "Cannot reject session in status: " + session.getStatus() +
-                    ". Only REQUESTED sessions can be rejected."
-            );
+            throw new InvalidSessionStateException("Only REQUESTED can be rejected");
         }
 
         session.setStatus(SessionStatus.REJECTED);
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        Session updated = sessionRepository.save(session);
+
+        publishSessionEvent(updated, RabbitMQConfig.SESSION_REJECTED_KEY);
+
+        return sessionMapper.toResponse(updated);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PUT /sessions/{id}/cancel  →  REQUESTED or ACCEPTED → CANCELLED
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // CANCEL SESSION
+    // ─────────────────────────────────────────────
     @Override
     @Transactional
     public SessionResponse cancelSession(Long sessionId) {
-        log.info("Cancelling session id={}", sessionId);
+
         Session session = findSessionOrThrow(sessionId);
 
         if (session.getStatus() == SessionStatus.COMPLETED ||
             session.getStatus() == SessionStatus.CANCELLED) {
-            throw new InvalidSessionStateException(
-                    "Cannot cancel a session that is already " + session.getStatus()
-            );
+
+            throw new InvalidSessionStateException("Cannot cancel completed/cancelled session");
         }
 
         session.setStatus(SessionStatus.CANCELLED);
-        return sessionMapper.toResponse(sessionRepository.save(session));
+        Session updated = sessionRepository.save(session);
+
+        publishSessionEvent(updated, RabbitMQConfig.SESSION_CANCELLED_KEY);
+
+        return sessionMapper.toResponse(updated);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GET /sessions/user/{userId}  →  Sessions where user is learner OR mentor
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // GET USER SESSIONS
+    // ─────────────────────────────────────────────
     @Override
     @Transactional(readOnly = true)
     public List<SessionResponse> getSessionsByUserId(Long userId) {
-        log.info("Fetching sessions for userId={}", userId);
-        return sessionRepository.findByLearnerIdOrMentorId(userId, userId)
+
+        return sessionRepository
+                .findByLearnerIdOrMentorId(userId, userId)
                 .stream()
                 .map(sessionMapper::toResponse)
                 .collect(Collectors.toList());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // COMMON METHODS
+    // ─────────────────────────────────────────────
 
-    private Session findSessionOrThrow(Long sessionId) {
-        return sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new SessionNotFoundException("Session not found with id: " + sessionId));
+    private Session findSessionOrThrow(Long id) {
+        return sessionRepository.findById(id)
+                .orElseThrow(() -> new SessionNotFoundException("Session not found: " + id));
     }
 
-    private void publishSessionBookedEvent(Session session) {
+    private void validateMentor(Long mentorId) {
         try {
-            SessionBookedEvent event = SessionBookedEvent.builder()
+            Boolean exists = mentorClient.mentorExists(mentorId);
+
+            if (!Boolean.TRUE.equals(exists)) {
+                throw new MentorNotFoundException("Mentor not found: " + mentorId);
+            }
+
+        } catch (MentorNotFoundException ex) {
+            throw ex;
+
+        } catch (Exception ex) {
+            throw new ServiceUnavailableException("Mentor service unavailable");
+        }
+    }
+
+    private void publishSessionEvent(Session session, String routingKey) {
+        try {
+            SessionEvent event = SessionEvent.builder()
                     .sessionId(session.getId())
                     .mentorId(session.getMentorId())
                     .learnerId(session.getLearnerId())
                     .sessionTime(session.getSessionDate())
                     .topic(session.getTopic())
-                    .eventType("SESSION_BOOKED")
+                    .eventType(routingKey)
                     .build();
 
             rabbitTemplate.convertAndSend(
                     RabbitMQConfig.SESSION_EXCHANGE,
-                    RabbitMQConfig.SESSION_BOOKED_KEY,
+                    routingKey,
                     event
             );
 
-            log.info("Published SESSION_BOOKED event for sessionId={}", session.getId());
+            log.info("Event published: {} for sessionId={}", routingKey, session.getId());
 
         } catch (Exception ex) {
-            log.error("Failed to publish event for sessionId={}", session.getId(), ex);
-
-            // THIS IS KEY → triggers rollback
-            throw new RuntimeException("Failed to publish session event");
+            log.error("Event publish failed", ex);
+            throw new RuntimeException("Event publishing failed");
         }
     }
 }
