@@ -1,12 +1,14 @@
 package com.skillsync.userservice.controller.internal;
 
 import com.skillsync.userservice.dto.UserDTO;
+import com.skillsync.userservice.dto.UserEmailDTO;
 import com.skillsync.userservice.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.util.List;
+//import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -16,10 +18,31 @@ public class InternalUserController {
     @Autowired
     private UserService userService;
 
-    @GetMapping("/{id}/email")
-    public ResponseEntity<Map<String, String>> getUserEmail(@PathVariable Long id) {
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
         Optional<UserDTO> user = userService.getUserById(id);
-        return user.map(u -> ResponseEntity.ok(Map.of("email", u.getEmail())))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return user.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping
+    public ResponseEntity<List<UserDTO>> getAllUsers() {
+        List<UserDTO> users = userService.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/{id}/email")
+    public ResponseEntity<UserEmailDTO> getUserEmail(@PathVariable Long id) {
+        return userService.getUserById(id)
+                .map(u -> ResponseEntity.ok(new UserEmailDTO(u.getEmail())))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<List<UserDTO>> getUsersByIds(@RequestBody List<Long> ids) {
+        List<UserDTO> users = ids.stream()
+                .flatMap(id -> userService.getUserById(id).stream())
+                .toList();
+        return ResponseEntity.ok(users);
     }
 }

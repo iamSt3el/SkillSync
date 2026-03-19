@@ -21,25 +21,54 @@ public class UserService {
                 .map(UserDTO::new)
                 .collect(Collectors.toList());
     }
+    
+    public List<UserDTO> getUsersByIds(List<Long> ids) {
+        return userRepository.findByIdIn(ids)
+                .stream()
+                .map(UserDTO::new)
+                .toList();
+    }
 
     public Optional<UserDTO> getUserById(Long id) {
         return userRepository.findById(id).map(UserDTO::new);
     }
 
     public UserDTO updateUser(Long id, UserDTO userDetails) {
-        Optional<User> optionalUser = userRepository.findById(id);
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-            user.setName(userDetails.getName());
-            user.setEmail(userDetails.getEmail());
-   
-            User savedUser = userRepository.save(user);
-            return new UserDTO(savedUser);
-        }
-        return null;
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new com.skillsync.userservice.exception.UserNotFoundException("User with id " + id + " not found"));
+
+        user.setName(userDetails.getName());
+        user.setEmail(userDetails.getEmail());
+
+        User savedUser = userRepository.save(user);
+        return new UserDTO(savedUser);
     }
 
     public UserDTO createUser(User user) {
+        User savedUser = userRepository.save(user);
+        return new UserDTO(savedUser);
+    }
+
+    public boolean deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new com.skillsync.userservice.exception.UserNotFoundException("User with id " + id + " not found");
+        }
+        userRepository.deleteById(id);
+        return true;
+    }
+
+    public UserDTO blockUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new com.skillsync.userservice.exception.UserNotFoundException("User with id " + id + " not found"));
+        user.setStatus(User.Status.BLOCKED);
+        User savedUser = userRepository.save(user);
+        return new UserDTO(savedUser);
+    }
+
+    public UserDTO unblockUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new com.skillsync.userservice.exception.UserNotFoundException("User with id " + id + " not found"));
+        user.setStatus(User.Status.ACTIVE);
         User savedUser = userRepository.save(user);
         return new UserDTO(savedUser);
     }

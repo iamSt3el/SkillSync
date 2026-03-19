@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public class UserDTO {
 
     private Long id;
+    private String username;
     private String name;
     private String email;
     private String role;
@@ -16,6 +17,7 @@ public class UserDTO {
 
     public UserDTO(User user) {
         this.id = user.getId();
+        this.username = user.getUsername();
         this.name = user.getName();
         this.email = user.getEmail();
         this.role = user.getRole();
@@ -29,6 +31,14 @@ public class UserDTO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getName() {
@@ -61,5 +71,17 @@ public class UserDTO {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @Override
+    public String toString() {
+        return "UserDTO{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", name='" + name + '\'' +
+                ", email='" + email + '\'' +
+                ", role='" + role + '\'' +
+                ", createdAt=" + createdAt +
+                '}';
     }
 }
