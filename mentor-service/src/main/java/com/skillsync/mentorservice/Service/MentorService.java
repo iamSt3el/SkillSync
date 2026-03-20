@@ -1,5 +1,8 @@
 package com.skillsync.mentorservice.service;
 
+import com.skillsync.mentorservice.Messaging.MentorAppliedEvent;
+import com.skillsync.mentorservice.Messaging.MentorApprovedEvent;
+import com.skillsync.mentorservice.Messaging.MentorEventPublisher;
 import com.skillsync.mentorservice.dto.request.AvailabilityRequest;
 
 import com.skillsync.mentorservice.dto.request.MentorApplyRequest;
@@ -17,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +32,7 @@ public class MentorService {
     private final MentorRepository mentorRepository;
     private final UserServiceClient userServiceClient;
     private final SkillServiceClient skillServiceClient;
+    private final MentorEventPublisher mentorEventPublisher;
 
     // POST /mentors/apply
     @Transactional
@@ -72,6 +77,16 @@ public class MentorService {
         }
 
         Mentor saved = mentorRepository.save(mentor);
+        mentorEventPublisher.publishMentorApplied(
+                MentorAppliedEvent.builder()
+                    .mentorId(saved.getId())
+                    .userId(saved.getUserId())
+                    .bio(saved.getBio())
+                    .experience(saved.getExperience())
+                    .hourlyRate(saved.getHourlyRate())
+                    .appliedAt(saved.getCreatedAt())
+                    .build()
+            );
         return buildMentorResponse(saved);
     }
 
@@ -143,7 +158,15 @@ public class MentorService {
     	Mentor mentor = mentorRepository.findById(id).orElseThrow( () -> new MentorNotFoundException("Mentor not found with id: " + id));
     	
     	mentor.setStatus(MentorStatus.ACTIVE);
-    	return buildMentorResponse(mentorRepository.save(mentor));
+    	Mentor saved = mentorRepository.save(mentor);
+    	 mentorEventPublisher.publishMentorApproved(
+    	            MentorApprovedEvent.builder()
+    	                    .mentorId(saved.getId())
+    	                    .userId(saved.getUserId())
+    	                    .approvedAt(LocalDateTime.now())
+    	                    .build()
+    	    );
+    	return buildMentorResponse(saved);
     	
  	
     }
