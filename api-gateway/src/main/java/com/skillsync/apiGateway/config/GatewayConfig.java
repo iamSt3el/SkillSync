@@ -52,4 +52,12 @@ public class GatewayConfig {
                 .filter(lb("notification-service"))
                 .build();
     }
+    
+    @Bean
+    public RouterFunction<ServerResponse> userServiceRoute() {
+        return route("user-service-route")
+                .route(path("/users/**"), http())
+                .filter(lb("user-service"))
+                .build();
+    }
 }

@@ -14,6 +14,8 @@ import com.skillsync.authservice.dto.response.AuthResponse;
 import com.skillsync.authservice.entity.Role;
 import com.skillsync.authservice.entity.User;
 import com.skillsync.authservice.entity.UserRole;
+import com.skillsync.authservice.event.UserEventProducer;
+import com.skillsync.authservice.event.UserRegisteredEvent;
 import com.skillsync.authservice.exception.InvalidCredentialsException;
 import com.skillsync.authservice.exception.InvalidTokenException;
 import com.skillsync.authservice.exception.UserAlreadyExistsException;
@@ -30,13 +32,15 @@ public class AuthServiceImpl implements AuthService {
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final UserEventProducer userEventProducer;
 	private final JwtUtil jwtUtil;
 
 	public AuthServiceImpl(UserRepository userRepository, RoleRepository roleRepository,
-			PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
+			PasswordEncoder passwordEncoder,UserEventProducer  userEventProducer,JwtUtil jwtUtil) {
 		this.roleRepository = roleRepository;
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
+		this.userEventProducer = userEventProducer;
 		this.jwtUtil = jwtUtil;
 	}
 
@@ -68,6 +72,11 @@ public class AuthServiceImpl implements AuthService {
 		String token = jwtUtil.generateToken(user.getEmail(), roles);
 		log.info("User registered: {}", user.getEmail());
 
+		UserRegisteredEvent event = new UserRegisteredEvent(user.getId(), user.getUsername(), user.getEmail(),
+				user.getPassword(), roles.get(0));
+		
+		userEventProducer.publishUserRegistered(event);
+
 		return new AuthResponse(token);
 	}
 
@@ -98,7 +107,7 @@ public class AuthServiceImpl implements AuthService {
 
 		String email = jwtUtil.extractEmail(token);
 
-		User user = userRepository.findByEmail(email).orElseThrow(() -> new InvalidCredentialsException()); 
+		User user = userRepository.findByEmail(email).orElseThrow(() -> new InvalidCredentialsException());
 
 		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
 				.collect(Collectors.toList());
