@@ -14,4 +14,9 @@ public class UserServiceClientFallback implements UserServiceClient {
                 .email("N/A")
                 .build();
     }
+
+    @Override
+    public UserResponse getUserByEmail(String email) {
+        throw new RuntimeException("User service unavailable");
+    }
 }

@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorResponseDTO> handleUserNotFound(UserNotFoundException e, HttpServletRequest request) {
         log.error("User not found: {}" + e.getMessage());
-        return buildResponse(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", e.getMessage(), request)
+        return buildResponse(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", e.getMessage(), request);
     }
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)

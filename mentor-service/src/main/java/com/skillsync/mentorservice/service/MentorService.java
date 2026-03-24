@@ -1,7 +1,6 @@
 package com.skillsync.mentorservice.service;
 
 import com.skillsync.mentorservice.dto.request.AvailabilityRequest;
-
 import com.skillsync.mentorservice.dto.request.MentorApplyRequest;
 import com.skillsync.mentorservice.dto.response.MentorResponse;
 import com.skillsync.mentorservice.dto.response.SkillResponse;
@@ -31,13 +30,17 @@ public class MentorService {
 
     // POST /mentors/apply
     @Transactional
-    public MentorResponse applyAsMentor(MentorApplyRequest request) {
-        if (mentorRepository.existsByUserId(request.getUserId())) {
+    public MentorResponse applyAsMentor(MentorApplyRequest request, String email) {
+        // Resolve the real userId from user-service using the authenticated user's email
+        UserResponse user = userServiceClient.getUserByEmail(email);
+        Long userId = user.getId();
+
+        if (mentorRepository.existsByUserId(userId)) {
             throw new IllegalStateException("User has already applied as a mentor");
         }
 
         Mentor mentor = Mentor.builder()
-                .userId(request.getUserId())
+                .userId(userId)
                 .bio(request.getBio())
                 .experience(request.getExperience())
                 .hourlyRate(request.getHourlyRate())
@@ -46,17 +49,6 @@ public class MentorService {
                 .reviewCount(0)
                 .build();
 
-//        if (request.getSkillIds() != null && !request.getSkillIds().isEmpty()) {
-//            List<MentorSkill> mentorSkills = request.getSkillIds().stream()
-//                    .map(skillId -> MentorSkill.builder()
-//                            .mentor(mentor)
-//                            .skillId(skillId)
-//                            .skillName("")
-//                            .build())
-//                    .collect(Collectors.toList());
-//            mentor.getMentorSkills().addAll(mentorSkills);
-//        }
-        
         if (request.getSkillIds() != null && !request.getSkillIds().isEmpty()) {
             List<MentorSkill> mentorSkills = new ArrayList<>();
             for (Long skillId : request.getSkillIds()) {
@@ -94,14 +86,34 @@ public class MentorService {
 
     // PUT /mentors/{id}/availability
     @Transactional
-    public MentorResponse updateAvailability(Long id, AvailabilityRequest request) {
+    public MentorResponse updateAvailability(Long id, AvailabilityRequest request, Long userId) {
         Mentor mentor = mentorRepository.findById(id)
                 .orElseThrow(() -> new MentorNotFoundException("Mentor not found with id: " + id));
+        if (!mentor.getUserId().equals(userId)) {
+            throw new SecurityException("You can only update your own availability");
+        }
         mentor.setAvailability(request.getSchedule());
         return buildMentorResponse(mentorRepository.save(mentor));
     }
 
-    // Called internally to update rating after a new review is submitted
+    // PUT /mentors/{id}/approve — admin only
+    @Transactional
+    public MentorResponse approveMentor(Long id) {
+        Mentor mentor = mentorRepository.findById(id)
+                .orElseThrow(() -> new MentorNotFoundException("Mentor not found with id: " + id));
+        mentor.setStatus(MentorStatus.ACTIVE);
+        return buildMentorResponse(mentorRepository.save(mentor));
+    }
+
+    // GET /mentors/{id}/exists — internal endpoint for session-service
+    @Transactional(readOnly = true)
+    public boolean mentorExists(Long id) {
+        return mentorRepository.findById(id)
+                .filter(m -> m.getStatus() == MentorStatus.ACTIVE)
+                .isPresent();
+    }
+
+    // Called internally to update rating after a review is submitted
     @Transactional
     public void updateRating(Long mentorId, double newRating) {
         Mentor mentor = mentorRepository.findById(mentorId)
@@ -115,10 +127,7 @@ public class MentorService {
         mentorRepository.save(mentor);
     }
 
-    // Private helper — builds MentorResponse, enriches with user details via Feign
     private MentorResponse buildMentorResponse(Mentor mentor) {
-//        UserResponse user = userServiceClient.getUserById(mentor.getUserId());
-
         List<String> skillNames = mentor.getMentorSkills().stream()
                 .map(MentorSkill::getSkillName)
                 .filter(name -> name != null && !name.isBlank())
@@ -136,15 +145,5 @@ public class MentorService {
                 .availability(mentor.getAvailability())
                 .skills(skillNames)
                 .build();
-    }
-    
-    @Transactional
-    public MentorResponse approveMentor(Long id) {
-    	Mentor mentor = mentorRepository.findById(id).orElseThrow( () -> new MentorNotFoundException("Mentor not found with id: " + id));
-    	
-    	mentor.setStatus(MentorStatus.ACTIVE);
-    	return buildMentorResponse(mentorRepository.save(mentor));
-    	
- 	
     }
 }

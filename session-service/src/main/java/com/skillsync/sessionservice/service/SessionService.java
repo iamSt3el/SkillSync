@@ -7,13 +7,15 @@ import java.util.List;
 
 public interface SessionService {
 
-    SessionResponse bookSession(SessionBookRequest request);
+    SessionResponse bookSession(SessionBookRequest request, Long learnerId);
 
-    SessionResponse acceptSession(Long sessionId);
+    SessionResponse acceptSession(Long sessionId, Long userId);
 
-    SessionResponse rejectSession(Long sessionId);
+    SessionResponse rejectSession(Long sessionId, Long userId);
 
-    SessionResponse cancelSession(Long sessionId);
+    SessionResponse cancelSession(Long sessionId, Long userId);
 
-    List<SessionResponse> getSessionsByUserId(Long userId);
+    List<SessionResponse> getSessionsByUserId(Long userId, Long requesterId, String role);
+
+    String getSessionStatus(Long sessionId);
 }

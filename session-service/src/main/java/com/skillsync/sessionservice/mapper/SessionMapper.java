@@ -9,10 +9,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class SessionMapper {
 
-    public Session toEntity(SessionBookRequest request) {
+    public Session toEntity(SessionBookRequest request, Long learnerId) {
         return Session.builder()
                 .mentorId(request.getMentorId())
-                .learnerId(request.getLearnerId())
+                .learnerId(learnerId)
                 .sessionDate(request.getSessionDate())
                 .topic(request.getTopic())
                 .status(SessionStatus.REQUESTED)

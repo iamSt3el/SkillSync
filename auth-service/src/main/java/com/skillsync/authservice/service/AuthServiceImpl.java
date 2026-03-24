@@ -69,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
 		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
 				.collect(Collectors.toList());
 
-		String token = jwtUtil.generateToken(user.getEmail(), roles);
+		String token = jwtUtil.generateToken(user.getEmail(), roles, user.getId());
 		log.info("User registered: {}", user.getEmail());
 
 		UserRegisteredEvent event = new UserRegisteredEvent(user.getId(), user.getUsername(), user.getEmail(),
@@ -92,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
 		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
 				.collect(Collectors.toList());
 
-		String token = jwtUtil.generateToken(user.getEmail(), roles);
+		String token = jwtUtil.generateToken(user.getEmail(), roles, user.getId());
 		log.info("User logged in: {}", user.getEmail());
 
 		return new AuthResponse(token);
@@ -112,7 +112,7 @@ public class AuthServiceImpl implements AuthService {
 		List<String> roles = user.getUserRoles().stream().map(ur -> ur.getRole().getName())
 				.collect(Collectors.toList());
 
-		String newToken = jwtUtil.generateToken(email, roles);
+		String newToken = jwtUtil.generateToken(email, roles, user.getId());
 		log.info("Token refreshed for: {}", email);
 
 		return new AuthResponse(newToken);

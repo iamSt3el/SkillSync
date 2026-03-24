@@ -23,7 +23,7 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="C:/Users/Kanav Jethi/Downloads/lombok.jar"/>
+	<classpathentry kind="lib" path="/home/steel/.local/share/nvim/mason/share/jdtls/lombok.jar"/>
 	<classpathentry kind="src" output="target/classes" path="src/main/java">
 		<attributes>
 			<attribute name="optional" value="true"/>

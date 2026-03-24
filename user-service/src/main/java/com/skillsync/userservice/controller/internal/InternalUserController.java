@@ -38,6 +38,13 @@ public class InternalUserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/by-email")
+    public ResponseEntity<UserDTO> getUserByEmail(@RequestParam String email) {
+        return userService.getUserByEmail(email)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/batch")
     public ResponseEntity<List<UserDTO>> getUsersByIds(@RequestBody List<Long> ids) {
         List<UserDTO> users = ids.stream()

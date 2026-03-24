@@ -41,7 +41,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+        if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)
+                || path.contains("/v3/api-docs")
+                || path.contains("/swagger-ui")
+                || path.contains("/webjars")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -65,12 +68,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String email = claims.getSubject();
             List<String> roles = claims.get("roles", List.class);
             String role = (roles != null && !roles.isEmpty()) ? roles.get(0) : "";
+            String userId = claims.get("userId") != null ? claims.get("userId").toString() : "";
 
             HttpServletRequestWrapper mutatedRequest = new HttpServletRequestWrapper(request) {
                 @Override
                 public String getHeader(String name) {
                     if ("X-User-Email".equals(name)) return email;
                     if ("X-User-Role".equals(name)) return role;
+                    if ("X-User-Id".equals(name)) return userId;
                     return super.getHeader(name);
                 }
 
@@ -78,6 +83,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 public Enumeration<String> getHeaders(String name) {
                     if ("X-User-Email".equals(name)) return Collections.enumeration(List.of(email));
                     if ("X-User-Role".equals(name)) return Collections.enumeration(List.of(role));
+                    if ("X-User-Id".equals(name)) return Collections.enumeration(List.of(userId));
                     return super.getHeaders(name);
                 }
 
@@ -86,6 +92,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Set<String> names = new HashSet<>(Collections.list(super.getHeaderNames()));
                     names.add("X-User-Email");
                     names.add("X-User-Role");
+                    names.add("X-User-Id");
                     return Collections.enumeration(names);
                 }
             };

@@ -33,6 +33,10 @@ public class UserService {
         return userRepository.findById(id).map(UserDTO::new);
     }
 
+    public Optional<UserDTO> getUserByEmail(String email) {
+        return userRepository.findByEmail(email).map(UserDTO::new);
+    }
+
     public UserDTO updateUser(Long id, UserDTO userDetails) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new com.skillsync.userservice.exception.UserNotFoundException("User with id " + id + " not found"));

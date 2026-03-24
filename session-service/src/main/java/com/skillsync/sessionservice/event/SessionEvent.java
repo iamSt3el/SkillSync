@@ -17,7 +17,7 @@ public class SessionEvent implements Serializable {
     private Long sessionId;
     private Long mentorId;
     private Long learnerId;
-    private LocalDateTime sessionTime;
+    private LocalDateTime sessionDate;
     private String topic;
-    private String eventType;  // SESSION_BOOKED etc
+    private String eventType;
 }

@@ -2,9 +2,6 @@ package com.skillsync.sessionservice.controller;
 
 import com.skillsync.sessionservice.dto.request.SessionBookRequest;
 import com.skillsync.sessionservice.dto.response.SessionResponse;
-import com.skillsync.sessionservice.entity.Session;
-import com.skillsync.sessionservice.exception.SessionNotFoundException;
-import com.skillsync.sessionservice.repository.SessionRepository;
 import com.skillsync.sessionservice.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,70 +19,80 @@ import java.util.List;
 public class SessionController {
 
     private final SessionService sessionService;
-    private final SessionRepository sessionRepository;
 
     /**
      * POST /sessions
-     * Learner books a new session with a mentor. Status starts as REQUESTED.
+     * learnerId is derived from X-User-Id (JWT claim) — cannot be faked via request body.
      */
     @PostMapping
-    public ResponseEntity<SessionResponse> bookSession(@Valid @RequestBody SessionBookRequest request) {
-        log.info("POST /sessions - booking session");
-        SessionResponse response = sessionService.bookSession(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<SessionResponse> bookSession(
+            @Valid @RequestBody SessionBookRequest request,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        log.info("POST /sessions - learnerId={}", userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(sessionService.bookSession(request, userId));
     }
 
     /**
      * PUT /sessions/{id}/accept
-     * Mentor accepts a REQUESTED session → ACCEPTED.
+     * Only the mentor who owns this session can accept it.
      */
     @PutMapping("/{id}/accept")
-    public ResponseEntity<SessionResponse> acceptSession(@PathVariable Long id) {
-        log.info("PUT /sessions/{}/accept", id);
-        return ResponseEntity.ok(sessionService.acceptSession(id));
+    public ResponseEntity<SessionResponse> acceptSession(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        log.info("PUT /sessions/{}/accept - userId={}", id, userId);
+        return ResponseEntity.ok(sessionService.acceptSession(id, userId));
     }
 
     /**
      * PUT /sessions/{id}/reject
-     * Mentor rejects a REQUESTED session → REJECTED.
+     * Only the mentor who owns this session can reject it.
      */
     @PutMapping("/{id}/reject")
-    public ResponseEntity<SessionResponse> rejectSession(@PathVariable Long id) {
-        log.info("PUT /sessions/{}/reject", id);
-        return ResponseEntity.ok(sessionService.rejectSession(id));
+    public ResponseEntity<SessionResponse> rejectSession(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        log.info("PUT /sessions/{}/reject - userId={}", id, userId);
+        return ResponseEntity.ok(sessionService.rejectSession(id, userId));
     }
 
     /**
      * PUT /sessions/{id}/cancel
-     * Learner or Mentor cancels a REQUESTED/ACCEPTED session → CANCELLED.
+     * Only the learner or mentor of this session can cancel it.
      */
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<SessionResponse> cancelSession(@PathVariable Long id) {
-        log.info("PUT /sessions/{}/cancel", id);
-        return ResponseEntity.ok(sessionService.cancelSession(id));
+    public ResponseEntity<SessionResponse> cancelSession(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        log.info("PUT /sessions/{}/cancel - userId={}", id, userId);
+        return ResponseEntity.ok(sessionService.cancelSession(id, userId));
     }
 
     /**
      * GET /sessions/user/{userId}
-     * Returns all sessions where the user is either the learner or the mentor.
+     * A user can only view their own sessions. Admins can view anyone's.
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<SessionResponse>> getSessionsByUserId(@PathVariable Long userId) {
-        log.info("GET /sessions/user/{}", userId);
-        return ResponseEntity.ok(sessionService.getSessionsByUserId(userId));
+    public ResponseEntity<List<SessionResponse>> getSessionsByUserId(
+            @PathVariable Long userId,
+            @RequestHeader("X-User-Id") Long requesterId,
+            @RequestHeader(value = "X-User-Role", required = false) String role) {
+
+        log.info("GET /sessions/user/{} - requesterId={}", userId, requesterId);
+        return ResponseEntity.ok(sessionService.getSessionsByUserId(userId, requesterId, role));
     }
 
     /**
      * GET /sessions/{sessionId}/status
-     * Internal endpoint consumed by Review Service via Feign.
-     * Validates that a session is COMPLETED before a review is allowed.
+     * Internal endpoint for Review Service to validate a session is COMPLETED.
      */
     @GetMapping("/{sessionId}/status")
     public ResponseEntity<String> getSessionStatus(@PathVariable Long sessionId) {
         log.info("GET /sessions/{}/status", sessionId);
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new SessionNotFoundException(
-                        "Session not found with id: " + sessionId));
-        return ResponseEntity.ok(session.getStatus().name());
+        return ResponseEntity.ok(sessionService.getSessionStatus(sessionId));
     }
 }
