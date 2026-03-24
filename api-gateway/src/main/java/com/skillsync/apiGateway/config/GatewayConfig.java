@@ -68,5 +68,13 @@ public class GatewayConfig {
                 .filter(lb("session-service"))
                 .build();
     }
+    
+    @Bean
+    public RouterFunction<ServerResponse> reviewServiceRoute() {
+        return route("review-service-route")
+                .route(path("/reviews/**"), http())
+                .filter(lb("review-service"))
+                .build();
+    }
 
 }
